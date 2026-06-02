@@ -128,7 +128,15 @@ const Scanner = () => {
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
-      processImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditingBlob(file);
+        setEditingImage(reader.result);
+        setRotation(0);
+        setCropPercent(12);
+        setIsEditorOpen(true);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -267,92 +275,135 @@ const Scanner = () => {
 
       {/* Image Editor Modal */}
       {isEditorOpen && editingImage && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setIsEditorOpen(false)}></div>
-          <div className="relative w-full max-w-xl bg-white rounded-2xl shadow-xl p-4 z-50">
-            <h3 className="font-black text-lg mb-3">Edit Foto</h3>
-            <div className="w-full h-64 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center mb-3">
-              <div style={{ transform: `rotate(${rotation}deg)`, maxWidth: '100%', maxHeight: '100%' }}>
-                <img src={editingImage} alt="edit" style={{ display: 'block', maxWidth: '100%', maxHeight: '100%' }} />
-              </div>
-              {/* Crop overlay indicator */}
-              <div className="absolute pointer-events-none" style={{ width: `${100 - cropPercent}%`, height: `${100 - cropPercent}%`, border: '2px dashed rgba(255,255,255,0.6)', boxSizing: 'border-box' }}></div>
+        <div className="fixed inset-0 z-40 bg-slate-950/95 text-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Edit Foto STB</p>
+              <p className="text-sm font-semibold">Tarik untuk memotong, putar bila miring</p>
             </div>
+            <button onClick={() => setIsEditorOpen(false)} className="text-slate-300 hover:text-white">Tutup</button>
+          </div>
 
-            <div className="flex items-center gap-3 mb-3">
-              <button onClick={() => setRotation((r) => (r - 90) % 360)} className="bg-slate-100 px-3 py-2 rounded-lg">Rotate -90°</button>
-              <button onClick={() => setRotation((r) => (r + 90) % 360)} className="bg-slate-100 px-3 py-2 rounded-lg">Rotate +90°</button>
-              <div className="flex-1">
-                <label className="text-xs text-slate-500">Crop Area</label>
-                <input type="range" min="0" max="40" value={cropPercent} onChange={(e) => setCropPercent(Number(e.target.value))} className="w-full" />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => setIsEditorOpen(false)} className="flex-1 bg-slate-100 py-2 rounded-2xl">Batal</button>
-              <button
-                onClick={async () => {
-                  try {
-                    setIsEditorOpen(false);
-                    setIsProcessing(true);
-                    // Apply crop and rotation via canvas
-                    const img = new Image();
-                    img.src = editingImage;
-                    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-
-                    // Calculate crop box (center crop)
-                    const cw = img.naturalWidth;
-                    const ch = img.naturalHeight;
-                    const cropFactor = (100 - cropPercent) / 100;
-                    const cropW = Math.floor(cw * cropFactor);
-                    const cropH = Math.floor(ch * cropFactor);
-                    const cropX = Math.floor((cw - cropW) / 2);
-                    const cropY = Math.floor((ch - cropH) / 2);
-
-                    // For rotation, adjust canvas accordingly
-                    const radians = (rotation % 360) * Math.PI / 180;
-                    const sin = Math.abs(Math.sin(radians));
-                    const cos = Math.abs(Math.cos(radians));
-                    const canvas = document.createElement('canvas');
-
-                    // Draw cropped area onto temporary canvas
-                    const tmpCanvas = document.createElement('canvas');
-                    tmpCanvas.width = cropW;
-                    tmpCanvas.height = cropH;
-                    const tCtx = tmpCanvas.getContext('2d');
-                    tCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-
-                    // If rotation is 0, use tmpCanvas as final
-                    if (rotation % 360 === 0) {
-                      canvas.width = cropW;
-                      canvas.height = cropH;
-                      const ctx = canvas.getContext('2d');
-                      ctx.drawImage(tmpCanvas, 0, 0);
-                    } else {
-                      // rotated canvas size
-                      canvas.width = Math.floor(cropW * cos + cropH * sin);
-                      canvas.height = Math.floor(cropW * sin + cropH * cos);
-                      const ctx = canvas.getContext('2d');
-                      // translate to center
-                      ctx.translate(canvas.width / 2, canvas.height / 2);
-                      ctx.rotate(radians);
-                      ctx.drawImage(tmpCanvas, -cropW / 2, -cropH / 2);
-                    }
-
-                    const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
-                    const file = new File([blob], 'stb_capture_edited.jpg', { type: 'image/jpeg' });
-                    await processImage(file);
-                  } catch (err) {
-                    console.error('Editor error:', err);
-                    alert('Gagal mengedit gambar: ' + err.message);
-                  } finally {
-                    setIsProcessing(false);
-                  }
+          <div className="relative flex-1 overflow-hidden p-4">
+            <div className="relative w-full h-full rounded-[32px] overflow-hidden bg-black border border-white/10">
+              <img
+                src={editingImage}
+                alt="edit preview"
+                className="absolute inset-0 m-auto max-w-none"
+                style={{
+                  transform: `translate(-50%, -50%) rotate(${rotation}deg) scale(${1 - cropPercent / 120})`,
+                  top: '50%',
+                  left: '50%',
+                  transformOrigin: 'center center'
                 }}
-                className="flex-1 bg-indigo-600 text-white py-2 rounded-2xl"
-              >
-                Terapkan & Lanjutkan
-              </button>
+              />
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute inset-0 bg-black/40"></div>
+                <div
+                  className="absolute border-2 border-white/90 rounded-[28px] mx-auto"
+                  style={{
+                    width: `${100 - cropPercent}%`,
+                    height: `${100 - cropPercent}%`,
+                    left: `${cropPercent / 2}%`,
+                    top: `${cropPercent / 2}%`
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center text-xs text-white/70">
+                  <span>Area crop ditampilkan, pastikan teks STB ada di dalam kotak</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-4 pb-5">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
+                  className="flex-1 border border-white/20 bg-white/5 py-3 rounded-2xl text-sm font-semibold hover:bg-white/10"
+                >
+                  Putar -90°
+                </button>
+                <button
+                  onClick={() => setRotation((r) => (r + 90) % 360)}
+                  className="flex-1 border border-white/20 bg-white/5 py-3 rounded-2xl text-sm font-semibold hover:bg-white/10"
+                >
+                  Putar +90°
+                </button>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-xs text-slate-300 mb-2">
+                  <span>Crop area</span>
+                  <span>{Math.round(100 - cropPercent)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  value={cropPercent}
+                  onChange={(e) => setCropPercent(Number(e.target.value))}
+                  className="w-full accent-indigo-500"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsEditorOpen(false)}
+                  className="flex-1 border border-white/20 bg-white/5 py-3 rounded-2xl text-sm font-semibold hover:bg-white/10"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsEditorOpen(false);
+                      setIsProcessing(true);
+                      const img = new Image();
+                      img.src = editingImage;
+                      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+                      const cw = img.naturalWidth;
+                      const ch = img.naturalHeight;
+                      const cropFactor = (100 - cropPercent) / 100;
+                      const cropW = Math.floor(cw * cropFactor);
+                      const cropH = Math.floor(ch * cropFactor);
+                      const cropX = Math.floor((cw - cropW) / 2);
+                      const cropY = Math.floor((ch - cropH) / 2);
+                      const radians = (rotation % 360) * Math.PI / 180;
+                      const sin = Math.abs(Math.sin(radians));
+                      const cos = Math.abs(Math.cos(radians));
+                      const tmpCanvas = document.createElement('canvas');
+                      tmpCanvas.width = cropW;
+                      tmpCanvas.height = cropH;
+                      const tCtx = tmpCanvas.getContext('2d');
+                      tCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+                      const canvas = document.createElement('canvas');
+                      if (rotation % 360 === 0) {
+                        canvas.width = cropW;
+                        canvas.height = cropH;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(tmpCanvas, 0, 0);
+                      } else {
+                        canvas.width = Math.floor(cropW * cos + cropH * sin);
+                        canvas.height = Math.floor(cropW * sin + cropH * cos);
+                        const ctx = canvas.getContext('2d');
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate(radians);
+                        ctx.drawImage(tmpCanvas, -cropW / 2, -cropH / 2);
+                      }
+                      const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
+                      const file = new File([blob], 'stb_capture_edited.jpg', { type: 'image/jpeg' });
+                      await processImage(file);
+                    } catch (err) {
+                      console.error('Editor error:', err);
+                      alert('Gagal mengedit gambar: ' + err.message);
+                    } finally {
+                      setIsProcessing(false);
+                    }
+                  }}
+                  className="flex-1 bg-indigo-600 py-3 rounded-2xl text-sm font-semibold text-white hover:bg-indigo-500"
+                >
+                  Simpan & Lanjutkan
+                </button>
+              </div>
             </div>
           </div>
         </div>
