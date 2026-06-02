@@ -235,7 +235,7 @@ const Review = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-32">
         {/* STB Preview + Status */}
         <div className="px-4 pt-4 pb-2 flex gap-3">
           <div className="w-16 h-20 rounded-xl overflow-hidden shadow-md border border-slate-200 flex-shrink-0">
@@ -385,7 +385,7 @@ const Review = () => {
       </div>
 
       {/* Bottom Action */}
-      <div className="p-4 glass border-t border-slate-100 sticky bottom-0 z-30" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 12px)' }}>
+      <div className="p-4 glass border-t border-slate-100 sticky bottom-0 z-40" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 12px)' }}>
         {!isEmailSent ? (
           <button
             onClick={handleSend}
