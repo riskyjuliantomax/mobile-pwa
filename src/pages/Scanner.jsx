@@ -49,8 +49,9 @@ const Scanner = () => {
       };
       const compressedFile = await imageCompression(imageFile, options);
       
-      const backendBase = import.meta.env.VITE_BACKEND_URL || '';
-      const endpoint = backendBase ? `${backendBase}/api/process-stb` : '/api/process-stb';
+      const rawBackend = import.meta.env.VITE_BACKEND_URL || '';
+      const backendBase = rawBackend && !/^https?:\/\//i.test(rawBackend) ? `https://${rawBackend}` : rawBackend;
+      const endpoint = backendBase ? `${backendBase.replace(/\/$/, '')}/api/process-stb` : '/api/process-stb';
 
       // Send to Backend for OCR
       const formData = new FormData();
