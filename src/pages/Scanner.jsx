@@ -20,6 +20,7 @@ const Scanner = () => {
   const [cropLeft, setCropLeft] = useState(60); // pixels from left
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [draggingHandle, setDraggingHandle] = useState(null); // which handle is being dragged
+  const [editorError, setEditorError] = useState('');
 
   const [mode, setMode] = useState('camera');
   const [userInfo, setUserInfo] = useState({ name: '...', email: '', role: '...', avatar: null });
@@ -185,7 +186,7 @@ const Scanner = () => {
       }
     } catch (error) {
       console.error('Error processing image:', error);
-      alert('Gagal memproses gambar: ' + error.message);
+      throw error;
     } finally {
       setIsProcessing(false);
     }
@@ -602,9 +603,19 @@ const Scanner = () => {
                   Reset
                 </button>
               </div>
+              {editorError && (
+                <div className="rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+                  <p className="font-semibold">Gagal memproses AI scan.</p>
+                  <p>{editorError}</p>
+                  <p className="mt-2 text-xs text-red-200">Crop tetap tersimpan. Tekan ulang tombol Simpan & Lanjutkan.</p>
+                </div>
+              )}
               <div className="flex gap-3">
                 <button
-                  onClick={() => setIsEditorOpen(false)}
+                  onClick={() => {
+                    setEditorError('');
+                    setIsEditorOpen(false);
+                  }}
                   className="flex-1 border border-white/20 bg-white/5 py-3 rounded-2xl text-sm font-semibold hover:bg-white/10"
                 >
                   Batal
@@ -612,7 +623,7 @@ const Scanner = () => {
                 <button
                   onClick={async () => {
                     try {
-                      setIsEditorOpen(false);
+                      setEditorError('');
                       setIsProcessing(true);
                       const img = new Image();
                       img.src = editingImage;
@@ -622,7 +633,10 @@ const Scanner = () => {
                       const previewRect = preview?.getBoundingClientRect();
                       const renderWidth = previewRect?.width || img.naturalWidth;
                       const renderHeight = previewRect?.height || img.naturalHeight;
-                      const imageAspect = img.naturalWidth / img.naturalHeight;
+                      const rotationNormalized = ((rotation % 360) + 360) % 360;
+                      const rotatedWidth = rotationNormalized === 90 || rotationNormalized === 270 ? img.naturalHeight : img.naturalWidth;
+                      const rotatedHeight = rotationNormalized === 90 || rotationNormalized === 270 ? img.naturalWidth : img.naturalHeight;
+                      const imageAspect = rotatedWidth / rotatedHeight;
                       const containerAspect = renderWidth / renderHeight;
                       let visibleWidth = renderWidth;
                       let visibleHeight = renderHeight;
@@ -639,8 +653,26 @@ const Scanner = () => {
                         offsetX = (renderWidth - visibleWidth) / 2;
                       }
 
-                      const scaleX = img.naturalWidth / visibleWidth;
-                      const scaleY = img.naturalHeight / visibleHeight;
+                      const rotatedCanvas = document.createElement('canvas');
+                      rotatedCanvas.width = rotatedWidth;
+                      rotatedCanvas.height = rotatedHeight;
+                      const rotatedCtx = rotatedCanvas.getContext('2d');
+                      rotatedCtx.save();
+                      if (rotationNormalized === 90) {
+                        rotatedCtx.translate(rotatedWidth, 0);
+                        rotatedCtx.rotate(Math.PI / 2);
+                      } else if (rotationNormalized === 180) {
+                        rotatedCtx.translate(rotatedWidth, rotatedHeight);
+                        rotatedCtx.rotate(Math.PI);
+                      } else if (rotationNormalized === 270) {
+                        rotatedCtx.translate(0, rotatedHeight);
+                        rotatedCtx.rotate(-Math.PI / 2);
+                      }
+                      rotatedCtx.drawImage(img, 0, 0);
+                      rotatedCtx.restore();
+
+                      const scaleX = rotatedWidth / visibleWidth;
+                      const scaleY = rotatedHeight / visibleHeight;
                       const cropLeftInImage = Math.max(0, cropLeft - offsetX);
                       const cropTopInImage = Math.max(0, cropTop - offsetY);
                       const cropRightInImage = Math.max(0, cropRight - offsetX);
@@ -650,37 +682,19 @@ const Scanner = () => {
                       const cropW = Math.floor(Math.max(0, visibleWidth - cropLeftInImage - cropRightInImage) * scaleX);
                       const cropH = Math.floor(Math.max(0, visibleHeight - cropTopInImage - cropBottomInImage) * scaleY);
 
-                      const radians = (rotation % 360) * Math.PI / 180;
-                      const sin = Math.abs(Math.sin(radians));
-                      const cos = Math.abs(Math.cos(radians));
-                      
-                      const tmpCanvas = document.createElement('canvas');
-                      tmpCanvas.width = cropW;
-                      tmpCanvas.height = cropH;
-                      const tCtx = tmpCanvas.getContext('2d');
-                      tCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-                      
                       const canvas = document.createElement('canvas');
-                      if (rotation % 360 === 0) {
-                        canvas.width = cropW;
-                        canvas.height = cropH;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(tmpCanvas, 0, 0);
-                      } else {
-                        canvas.width = Math.floor(cropW * cos + cropH * sin);
-                        canvas.height = Math.floor(cropW * sin + cropH * cos);
-                        const ctx = canvas.getContext('2d');
-                        ctx.translate(canvas.width / 2, canvas.height / 2);
-                        ctx.rotate(radians);
-                        ctx.drawImage(tmpCanvas, -cropW / 2, -cropH / 2);
-                      }
+                      canvas.width = cropW;
+                      canvas.height = cropH;
+                      const ctx = canvas.getContext('2d');
+                      ctx.drawImage(rotatedCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
                       
                       const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
                       const file = new File([blob], 'stb_capture_edited.jpg', { type: 'image/jpeg' });
                       await processImage(file);
+                      setIsEditorOpen(false);
                     } catch (err) {
                       console.error('Editor error:', err);
-                      alert('Gagal mengedit gambar: ' + err.message);
+                      setEditorError(err.message || 'Gagal mengedit gambar. Silakan coba lagi.');
                     } finally {
                       setIsProcessing(false);
                     }

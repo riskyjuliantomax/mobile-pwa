@@ -79,9 +79,6 @@ const Layout = () => {
 
         </nav>
       </div>
-
-      {/* Safe area padding for bottom nav */}
-      <div className="h-safe-area-inset-bottom" />
     </div>
   );
 };
