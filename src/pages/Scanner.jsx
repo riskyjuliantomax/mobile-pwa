@@ -63,7 +63,7 @@ const Scanner = () => {
 
       const responseText = await response.text();
       if (!response.ok) {
-        throw new Error(`Server error ${response.status}: ${responseText || 'Tidak ada respon'}`);
+        throw new Error(backendBase + `Server error ${response.status}: ${responseText || 'Tidak ada respon'}`);
       }
 
       const result = responseText ? JSON.parse(responseText) : null;
