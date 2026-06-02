@@ -49,15 +49,18 @@ const Scanner = () => {
     fetchUser();
   }, []);
 
-  // Prevent body scroll when editor is open
+  // Prevent body/html scroll when editor is open
   useEffect(() => {
     if (isEditorOpen) {
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     }
     return () => {
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     };
   }, [isEditorOpen]);
 
@@ -72,6 +75,50 @@ const Scanner = () => {
       window.removeEventListener('pointercancel', clearDrag);
     };
   }, [isEditorOpen]);
+
+  const handleEditorPointerMove = useCallback((event) => {
+    if (!draggingHandle) return;
+    event.preventDefault();
+    const container = cropContainerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const deltaX = event.clientX - rect.left;
+    const deltaY = event.clientY - rect.top;
+    const minCrop = 0;
+    const maxCrop = 200;
+
+    if (draggingHandle === 'top-left') {
+      setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+      setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+    } else if (draggingHandle === 'top-right') {
+      setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+      setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+    } else if (draggingHandle === 'bottom-left') {
+      setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+      setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+    } else if (draggingHandle === 'bottom-right') {
+      setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+      setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+    } else if (draggingHandle === 'top') {
+      setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+    } else if (draggingHandle === 'bottom') {
+      setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+    } else if (draggingHandle === 'left') {
+      setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+    } else if (draggingHandle === 'right') {
+      setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+    }
+  }, [draggingHandle]);
+
+  useEffect(() => {
+    if (!isEditorOpen) return undefined;
+    if (!draggingHandle) return undefined;
+
+    window.addEventListener('pointermove', handleEditorPointerMove, { passive: false });
+    return () => {
+      window.removeEventListener('pointermove', handleEditorPointerMove, { passive: false });
+    };
+  }, [isEditorOpen, draggingHandle, handleEditorPointerMove]);
 
   const processImage = async (imageFile) => {
     setIsProcessing(true);
