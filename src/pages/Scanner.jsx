@@ -48,6 +48,18 @@ const Scanner = () => {
     fetchUser();
   }, []);
 
+  // Prevent body scroll when editor is open
+  useEffect(() => {
+    if (isEditorOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isEditorOpen]);
+
   const processImage = async (imageFile) => {
     setIsProcessing(true);
     try {
@@ -152,7 +164,7 @@ const Scanner = () => {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-slate-900 relative overflow-hidden">
+    <div className="h-full w-full flex flex-col bg-slate-900 relative overflow-hidden" style={{ overflowY: 'hidden' }}>
       {/* Header with User Info */}
       <div className="glass-dark text-white p-4 flex justify-between items-center absolute top-0 w-full z-20">
         <div>
@@ -286,7 +298,43 @@ const Scanner = () => {
 
       {/* Image Editor Modal */}
       {isEditorOpen && editingImage && (
-        <div className="fixed inset-0 z-40 bg-slate-950/95 text-white flex flex-col">
+        <div
+          className="fixed inset-0 z-40 bg-slate-950/95 text-white flex flex-col overflow-hidden"
+          onMouseMove={(e) => {
+            if (!draggingHandle) return;
+            const container = e.currentTarget.querySelector('[data-crop-container]');
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            const deltaX = e.clientX - rect.left;
+            const deltaY = e.clientY - rect.top;
+            const minCrop = 0;
+            const maxCrop = 200;
+
+            if (draggingHandle === 'top-left') {
+              setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+              setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+            } else if (draggingHandle === 'top-right') {
+              setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+              setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+            } else if (draggingHandle === 'bottom-left') {
+              setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+              setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+            } else if (draggingHandle === 'bottom-right') {
+              setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+              setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+            } else if (draggingHandle === 'top') {
+              setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+            } else if (draggingHandle === 'bottom') {
+              setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+            } else if (draggingHandle === 'left') {
+              setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+            } else if (draggingHandle === 'right') {
+              setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+            }
+          }}
+          onMouseUp={() => setDraggingHandle(null)}
+          onMouseLeave={() => setDraggingHandle(null)}
+        >
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Edit Foto STB</p>
@@ -295,7 +343,7 @@ const Scanner = () => {
             <button onClick={() => setIsEditorOpen(false)} className="text-slate-300 hover:text-white text-sm font-semibold">Tutup</button>
           </div>
 
-          <div className="relative flex-1 overflow-hidden p-4 flex items-center justify-center">
+          <div className="relative flex-1 overflow-hidden p-4 flex items-center justify-center" data-crop-container>
             {/* Main preview container */}
             <div className="relative w-full h-full max-w-2xl max-h-full">
               <div
@@ -456,46 +504,10 @@ const Scanner = () => {
             </div>
 
             {/* Mouse move and up handlers for dragging */}
-            {draggingHandle && (
-              <div
-                onMouseMove={(e) => {
-                  const container = e.currentTarget;
-                  const rect = container.getBoundingClientRect();
-                  const deltaX = e.clientX - rect.left;
-                  const deltaY = e.clientY - rect.top;
-                  const minCrop = 0;
-                  const maxCrop = 200;
 
-                  if (draggingHandle === 'top-left') {
-                    setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
-                    setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
-                  } else if (draggingHandle === 'top-right') {
-                    setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
-                    setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
-                  } else if (draggingHandle === 'bottom-left') {
-                    setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
-                    setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
-                  } else if (draggingHandle === 'bottom-right') {
-                    setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
-                    setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
-                  } else if (draggingHandle === 'top') {
-                    setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
-                  } else if (draggingHandle === 'bottom') {
-                    setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
-                  } else if (draggingHandle === 'left') {
-                    setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
-                  } else if (draggingHandle === 'right') {
-                    setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
-                  }
-                }}
-                onMouseUp={() => setDraggingHandle(null)}
-                onMouseLeave={() => setDraggingHandle(null)}
-                className="absolute inset-0 z-5"
-              />
-            )}
           </div>
 
-          <div className="px-4 pb-5">
+          <div className="px-4 pb-24">
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <button

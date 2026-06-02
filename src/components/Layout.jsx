@@ -30,7 +30,7 @@ const Layout = () => {
       <div className="absolute bottom-[20%] right-[-10%] w-48 h-48 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000 pointer-events-none"></div>
 
       {/* Main Content - stretch to fill, nav positioned fixed below */}
-      <main className="flex-1 overflow-hidden z-10 relative">
+      <main className="flex-1 overflow-y-auto z-10 relative">
         <Outlet />
       </main>
 
