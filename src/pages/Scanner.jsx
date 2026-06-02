@@ -12,8 +12,13 @@ const Scanner = () => {
   const [editingImage, setEditingImage] = useState(null); // data URL for editor
   const [editingBlob, setEditingBlob] = useState(null); // original blob
   const [rotation, setRotation] = useState(0); // degrees
-  const [cropPercent, setCropPercent] = useState(12); // percent to crop from each side (0-40)
+  const [cropTop, setCropTop] = useState(60); // pixels from top
+  const [cropRight, setCropRight] = useState(60); // pixels from right
+  const [cropBottom, setCropBottom] = useState(60); // pixels from bottom
+  const [cropLeft, setCropLeft] = useState(60); // pixels from left
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [draggingHandle, setDraggingHandle] = useState(null); // which handle is being dragged
+
   const [mode, setMode] = useState('camera');
   const [userInfo, setUserInfo] = useState({ name: '...', email: '', role: '...', avatar: null });
 
@@ -119,7 +124,10 @@ const Scanner = () => {
           setEditingBlob(blob);
           setEditingImage(imageSrc);
           setRotation(0);
-          setCropPercent(12);
+          setCropTop(60);
+          setCropRight(60);
+          setCropBottom(60);
+          setCropLeft(60);
           setIsEditorOpen(true);
         });
     }
@@ -133,7 +141,10 @@ const Scanner = () => {
         setEditingBlob(file);
         setEditingImage(reader.result);
         setRotation(0);
-        setCropPercent(12);
+        setCropTop(60);
+        setCropRight(60);
+        setCropBottom(60);
+        setCropLeft(60);
         setIsEditorOpen(true);
       };
       reader.readAsDataURL(file);
@@ -279,40 +290,209 @@ const Scanner = () => {
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Edit Foto STB</p>
-              <p className="text-sm font-semibold">Tarik untuk memotong, putar bila miring</p>
+              <p className="text-sm font-semibold">Tarik pinggir untuk memotong, putar bila miring</p>
             </div>
-            <button onClick={() => setIsEditorOpen(false)} className="text-slate-300 hover:text-white">Tutup</button>
+            <button onClick={() => setIsEditorOpen(false)} className="text-slate-300 hover:text-white text-sm font-semibold">Tutup</button>
           </div>
 
-          <div className="relative flex-1 overflow-hidden p-4">
-            <div className="relative w-full h-full rounded-[32px] overflow-hidden bg-black border border-white/10">
-              <img
-                src={editingImage}
-                alt="edit preview"
-                className="absolute inset-0 m-auto max-w-none"
+          <div className="relative flex-1 overflow-hidden p-4 flex items-center justify-center">
+            {/* Main preview container */}
+            <div className="relative w-full h-full max-w-2xl max-h-full">
+              <div
+                className="relative w-full h-full rounded-[28px] overflow-hidden bg-black border-2 border-white/10 shadow-2xl"
                 style={{
-                  transform: `translate(-50%, -50%) rotate(${rotation}deg) scale(${1 - cropPercent / 120})`,
-                  top: '50%',
-                  left: '50%',
-                  transformOrigin: 'center center'
+                  aspectRatio: '3/4'
                 }}
-              />
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute inset-0 bg-black/40"></div>
-                <div
-                  className="absolute border-2 border-white/90 rounded-[28px] mx-auto"
+              >
+                {/* Image container - scale and center the image */}
+                <img
+                  src={editingImage}
+                  alt="edit preview"
+                  className="absolute inset-0 w-full h-full object-cover"
                   style={{
-                    width: `${100 - cropPercent}%`,
-                    height: `${100 - cropPercent}%`,
-                    left: `${cropPercent / 2}%`,
-                    top: `${cropPercent / 2}%`
+                    transform: `rotate(${rotation}deg)`,
+                    objectPosition: 'center'
                   }}
                 />
-                <div className="absolute inset-0 flex items-center justify-center text-xs text-white/70">
-                  <span>Area crop ditampilkan, pastikan teks STB ada di dalam kotak</span>
-                </div>
+
+                {/* Dark overlay outside crop area */}
+                <div
+                  className="absolute"
+                  style={{
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: `${cropTop}px`,
+                    background: 'rgba(0,0,0,0.6)',
+                    zIndex: 10
+                  }}
+                />
+                <div
+                  className="absolute"
+                  style={{
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: `${cropBottom}px`,
+                    background: 'rgba(0,0,0,0.6)',
+                    zIndex: 10
+                  }}
+                />
+                <div
+                  className="absolute"
+                  style={{
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: `${cropLeft}px`,
+                    background: 'rgba(0,0,0,0.6)',
+                    zIndex: 10
+                  }}
+                />
+                <div
+                  className="absolute"
+                  style={{
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: `${cropRight}px`,
+                    background: 'rgba(0,0,0,0.6)',
+                    zIndex: 10
+                  }}
+                />
+
+                {/* Crop frame border */}
+                <div
+                  className="absolute border-2 border-white/80 pointer-events-none"
+                  style={{
+                    top: `${cropTop}px`,
+                    left: `${cropLeft}px`,
+                    right: `${cropRight}px`,
+                    bottom: `${cropBottom}px`,
+                    zIndex: 15
+                  }}
+                />
+
+                {/* Corner handles - draggable */}
+                {/* Top-left corner */}
+                <div
+                  onMouseDown={() => setDraggingHandle('top-left')}
+                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-nwse-resize"
+                  style={{
+                    top: `calc(${cropTop}px - 8px)`,
+                    left: `calc(${cropLeft}px - 8px)`,
+                    zIndex: 20
+                  }}
+                />
+                {/* Top-right corner */}
+                <div
+                  onMouseDown={() => setDraggingHandle('top-right')}
+                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-nesw-resize"
+                  style={{
+                    top: `calc(${cropTop}px - 8px)`,
+                    right: `calc(${cropRight}px - 8px)`,
+                    zIndex: 20
+                  }}
+                />
+                {/* Bottom-left corner */}
+                <div
+                  onMouseDown={() => setDraggingHandle('bottom-left')}
+                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-nesw-resize"
+                  style={{
+                    bottom: `calc(${cropBottom}px - 8px)`,
+                    left: `calc(${cropLeft}px - 8px)`,
+                    zIndex: 20
+                  }}
+                />
+                {/* Bottom-right corner */}
+                <div
+                  onMouseDown={() => setDraggingHandle('bottom-right')}
+                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-se-resize"
+                  style={{
+                    bottom: `calc(${cropBottom}px - 8px)`,
+                    right: `calc(${cropRight}px - 8px)`,
+                    zIndex: 20
+                  }}
+                />
+
+                {/* Edge handles */}
+                {/* Top edge */}
+                <div
+                  onMouseDown={() => setDraggingHandle('top')}
+                  className="absolute left-1/2 -translate-x-1/2 w-6 h-2 bg-white/50 rounded-full cursor-n-resize"
+                  style={{
+                    top: `calc(${cropTop}px - 6px)`,
+                    zIndex: 20
+                  }}
+                />
+                {/* Bottom edge */}
+                <div
+                  onMouseDown={() => setDraggingHandle('bottom')}
+                  className="absolute left-1/2 -translate-x-1/2 w-6 h-2 bg-white/50 rounded-full cursor-s-resize"
+                  style={{
+                    bottom: `calc(${cropBottom}px - 6px)`,
+                    zIndex: 20
+                  }}
+                />
+                {/* Left edge */}
+                <div
+                  onMouseDown={() => setDraggingHandle('left')}
+                  className="absolute top-1/2 -translate-y-1/2 w-2 h-6 bg-white/50 rounded-full cursor-w-resize"
+                  style={{
+                    left: `calc(${cropLeft}px - 6px)`,
+                    zIndex: 20
+                  }}
+                />
+                {/* Right edge */}
+                <div
+                  onMouseDown={() => setDraggingHandle('right')}
+                  className="absolute top-1/2 -translate-y-1/2 w-2 h-6 bg-white/50 rounded-full cursor-e-resize"
+                  style={{
+                    right: `calc(${cropRight}px - 6px)`,
+                    zIndex: 20
+                  }}
+                />
               </div>
             </div>
+
+            {/* Mouse move and up handlers for dragging */}
+            {draggingHandle && (
+              <div
+                onMouseMove={(e) => {
+                  const container = e.currentTarget;
+                  const rect = container.getBoundingClientRect();
+                  const deltaX = e.clientX - rect.left;
+                  const deltaY = e.clientY - rect.top;
+                  const minCrop = 0;
+                  const maxCrop = 200;
+
+                  if (draggingHandle === 'top-left') {
+                    setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+                    setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+                  } else if (draggingHandle === 'top-right') {
+                    setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+                    setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+                  } else if (draggingHandle === 'bottom-left') {
+                    setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+                    setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+                  } else if (draggingHandle === 'bottom-right') {
+                    setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+                    setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+                  } else if (draggingHandle === 'top') {
+                    setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+                  } else if (draggingHandle === 'bottom') {
+                    setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+                  } else if (draggingHandle === 'left') {
+                    setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+                  } else if (draggingHandle === 'right') {
+                    setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+                  }
+                }}
+                onMouseUp={() => setDraggingHandle(null)}
+                onMouseLeave={() => setDraggingHandle(null)}
+                className="absolute inset-0 z-5"
+              />
+            )}
           </div>
 
           <div className="px-4 pb-5">
@@ -330,20 +510,17 @@ const Scanner = () => {
                 >
                   Putar +90°
                 </button>
-              </div>
-              <div>
-                <div className="flex items-center justify-between text-xs text-slate-300 mb-2">
-                  <span>Crop area</span>
-                  <span>{Math.round(100 - cropPercent)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="40"
-                  value={cropPercent}
-                  onChange={(e) => setCropPercent(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
-                />
+                <button
+                  onClick={() => {
+                    setCropTop(60);
+                    setCropRight(60);
+                    setCropBottom(60);
+                    setCropLeft(60);
+                  }}
+                  className="flex-1 border border-white/20 bg-white/5 py-3 rounded-2xl text-sm font-semibold hover:bg-white/10"
+                >
+                  Reset
+                </button>
               </div>
               <div className="flex gap-3">
                 <button
@@ -360,21 +537,29 @@ const Scanner = () => {
                       const img = new Image();
                       img.src = editingImage;
                       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+                      
+                      // Scale crop values to image dimensions
+                      const containerWidth = 400; // approx max-w-2xl in px
+                      const scaleX = img.naturalWidth / containerWidth;
+                      const scaleY = img.naturalHeight / containerWidth; // assuming square crop frame
+                      
                       const cw = img.naturalWidth;
                       const ch = img.naturalHeight;
-                      const cropFactor = (100 - cropPercent) / 100;
-                      const cropW = Math.floor(cw * cropFactor);
-                      const cropH = Math.floor(ch * cropFactor);
-                      const cropX = Math.floor((cw - cropW) / 2);
-                      const cropY = Math.floor((ch - cropH) / 2);
+                      const cropX = Math.floor(cropLeft * scaleX);
+                      const cropY = Math.floor(cropTop * scaleY);
+                      const cropW = Math.floor((cw - cropLeft * scaleX - cropRight * scaleX));
+                      const cropH = Math.floor((ch - cropTop * scaleY - cropBottom * scaleY));
+
                       const radians = (rotation % 360) * Math.PI / 180;
                       const sin = Math.abs(Math.sin(radians));
                       const cos = Math.abs(Math.cos(radians));
+                      
                       const tmpCanvas = document.createElement('canvas');
                       tmpCanvas.width = cropW;
                       tmpCanvas.height = cropH;
                       const tCtx = tmpCanvas.getContext('2d');
                       tCtx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+                      
                       const canvas = document.createElement('canvas');
                       if (rotation % 360 === 0) {
                         canvas.width = cropW;
@@ -389,6 +574,7 @@ const Scanner = () => {
                         ctx.rotate(radians);
                         ctx.drawImage(tmpCanvas, -cropW / 2, -cropH / 2);
                       }
+                      
                       const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
                       const file = new File([blob], 'stb_capture_edited.jpg', { type: 'image/jpeg' });
                       await processImage(file);
