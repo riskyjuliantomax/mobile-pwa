@@ -35,8 +35,23 @@ const Review = () => {
     setSelectedThread(null);
     try {
       const response = await fetch(`/api/gmail/search?query=${encodeURIComponent(noPermintaan)}`);
-      const result = await response.json();
-      if (result.success) {
+      const text = await response.text();
+      let result = null;
+      try {
+        result = text ? JSON.parse(text) : null;
+      } catch (err) {
+        console.error('Invalid JSON from /api/gmail/search:', text);
+        alert('Gagal memproses hasil pencarian Gmail: respons server tidak valid. Lihat console untuk detail.');
+        return;
+      }
+
+      if (!response.ok || result?.success === false) {
+        console.error('Gmail search error:', result || text);
+        alert('Gmail search error: ' + (result?.error || 'Unknown error'));
+        return;
+      }
+
+      if (result && result.success) {
         const threadsWithScores = result.threads.map((t, index) => ({
           ...t,
           matchScore: index === 0 ? 98 : index === 1 ? 85 : 70
@@ -370,7 +385,7 @@ const Review = () => {
       </div>
 
       {/* Bottom Action */}
-      <div className="p-4 glass border-t border-slate-100">
+      <div className="p-4 glass border-t border-slate-100 sticky bottom-0 z-30" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 12px)' }}>
         {!isEmailSent ? (
           <button
             onClick={handleSend}
