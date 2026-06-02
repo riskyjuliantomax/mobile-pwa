@@ -13,6 +13,10 @@ const Review = () => {
   const namaBarang = location.state?.namaBarang || '';
   const imageFile = location.state?.imageFile;
 
+  const rawBackend = import.meta.env.VITE_BACKEND_URL || '';
+  const backendBase = rawBackend && !/^https?:\/\//i.test(rawBackend) ? `https://${rawBackend}` : rawBackend;
+  const backendApi = backendBase ? `${backendBase.replace(/\/$/, '')}/api` : '/api';
+
   const [isScanning, setIsScanning] = useState(true);
   const [extractedData, setExtractedData] = useState({ noPermintaan: initialNoPermintaan });
   const [emailThreads, setEmailThreads] = useState([]);
@@ -34,7 +38,7 @@ const Review = () => {
     setEmailThreads([]);
     setSelectedThread(null);
     try {
-      const response = await fetch(`/api/gmail/search?query=${encodeURIComponent(noPermintaan)}`);
+      const response = await fetch(`${backendApi}/gmail/search?query=${encodeURIComponent(noPermintaan)}`);
       const text = await response.text();
       let result = null;
       try {
@@ -120,7 +124,7 @@ const Review = () => {
       formData.append('subject', thread.subject);
       formData.append('toEmail', thread.sender); // In real app, might need extraction of email only
 
-      const response = await fetch('/api/gmail/reply', {
+      const response = await fetch(`${backendApi}/gmail/reply`, {
         method: 'POST',
         body: formData,
       });
@@ -235,7 +239,7 @@ const Review = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-32">
+      <div className="flex-1 overflow-y-auto pb-52">
         {/* STB Preview + Status */}
         <div className="px-4 pt-4 pb-2 flex gap-3">
           <div className="w-16 h-20 rounded-xl overflow-hidden shadow-md border border-slate-200 flex-shrink-0">
@@ -384,54 +388,58 @@ const Review = () => {
         )}
       </div>
 
-      {/* Bottom Action */}
-      <div className="p-4 glass border-t border-slate-100 sticky bottom-0 z-40" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 12px)' }}>
-        {!isEmailSent ? (
-          <button
-            onClick={handleSend}
-            disabled={noPermintaanError || isSending || isEditing || isSearchingGmail}
-            className={`w-full py-4 px-4 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base ${noPermintaanError || isSending || isEditing || isSearchingGmail
-              ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-200'
-              }`}
-          >
-            {isSending ? (
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                <span>Mengirim Balasan...</span>
-              </div>
-            ) : (
-              <>
-                <Reply size={20} />
-                <span>Balas ke Gmail</span>
-              </>
-            )}
-          </button>
-        ) : (
-          <div className="animate-fade-in-up">
-            <div className="flex items-center gap-2 mb-3 justify-center text-emerald-600 bg-emerald-50 py-2 rounded-xl border border-emerald-100">
-              <CheckCircle2 size={16} />
-              <span className="text-sm font-bold">Email Balasan Terkirim!</span>
-            </div>
+      {/* Bottom Action Spacer */}
+      <div className="h-[calc(96px+env(safe-area-inset-bottom,16px))]" />
+
+      <div className="fixed left-0 right-0 bottom-[calc(76px+env(safe-area-inset-bottom,16px))] px-4 z-40">
+        <div className="glass border border-slate-100 rounded-3xl p-4 shadow-xl shadow-slate-200/40">
+          {!isEmailSent ? (
             <button
-              onClick={handleSaveArchive}
-              disabled={isSavingArchive}
-              className="w-full py-4 px-4 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base bg-slate-800 text-white hover:bg-slate-700"
+              onClick={handleSend}
+              disabled={noPermintaanError || isSending || isEditing || isSearchingGmail}
+              className={`w-full py-4 px-4 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base ${noPermintaanError || isSending || isEditing || isSearchingGmail
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-200'
+                }`}
             >
-              {isSavingArchive ? (
+              {isSending ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin"></div>
-                  <span>Menyimpan...</span>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Mengirim Balasan...</span>
                 </div>
               ) : (
                 <>
-                  <DatabaseBackup size={20} className="text-emerald-400" />
-                  <span>Simpan ke Arsip STB</span>
+                  <Reply size={20} />
+                  <span>Balas ke Gmail</span>
                 </>
               )}
             </button>
-          </div>
-        )}
+          ) : (
+            <div className="animate-fade-in-up">
+              <div className="flex items-center gap-2 mb-3 justify-center text-emerald-600 bg-emerald-50 py-2 rounded-xl border border-emerald-100">
+                <CheckCircle2 size={16} />
+                <span className="text-sm font-bold">Email Balasan Terkirim!</span>
+              </div>
+              <button
+                onClick={handleSaveArchive}
+                disabled={isSavingArchive}
+                className="w-full py-4 px-4 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base bg-slate-800 text-white hover:bg-slate-700"
+              >
+                {isSavingArchive ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin"></div>
+                    <span>Menyimpan...</span>
+                  </div>
+                ) : (
+                  <>
+                    <DatabaseBackup size={20} className="text-emerald-400" />
+                    <span>Simpan ke Arsip STB</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
