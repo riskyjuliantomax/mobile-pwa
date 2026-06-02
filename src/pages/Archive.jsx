@@ -301,9 +301,9 @@ const Archive = () => {
     return Object.entries(grouped).map(([ship, entries]) => ({ ship, entries }));
   }, [filteredData]);
 
-  // Auto-expand kapal pertama
+  // Auto-expand kapal pertama only when there's a single ship group
   useEffect(() => {
-    if (groupedData.length > 0 && !expandedShip) {
+    if (groupedData.length === 1 && expandedShip === null) {
       setExpandedShip(groupedData[0].ship);
     }
   }, [groupedData, expandedShip]);

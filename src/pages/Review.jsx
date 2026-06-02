@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, AlertTriangle, CheckCircle2, Search, Mail, Reply, Sparkles, Pencil, X, Check, RefreshCw, Save, DatabaseBackup } from 'lucide-react';
 import { supabase } from '../supabase';
@@ -118,11 +119,21 @@ const Review = () => {
     setIsSending(true);
     try {
       const formData = new FormData();
-      formData.append('image', imageFile);
+      // Ensure we have a File. If only data URL is present, convert to blob first.
+      let fileToSend = imageFile;
+      if (!fileToSend && imageData) {
+        const res = await fetch(imageData);
+        const blob = await res.blob();
+        fileToSend = new File([blob], `stb_${(extractedData.noPermintaan || 'capture').replace(/\//g,'_')}.jpg`, { type: blob.type || 'image/jpeg' });
+      }
+      formData.append('image', fileToSend);
       formData.append('threadId', thread.id);
       formData.append('messageId', thread.messageId);
       formData.append('subject', thread.subject);
-      formData.append('toEmail', thread.sender); // In real app, might need extraction of email only
+      // Allow reply-all: send recipients string as returned by backend
+      formData.append('toEmail', thread.sender);
+      formData.append('replyAll', 'true');
+      formData.append('recipients', thread.recipients || '');
 
       const response = await fetch(`${backendApi}/gmail/reply`, {
         method: 'POST',
@@ -388,59 +399,61 @@ const Review = () => {
         )}
       </div>
 
-      {/* Bottom Action Spacer */}
-      <div className="h-[calc(156px+env(safe-area-inset-bottom,16px))]" />
+      {/* Bottom Action Spacer (extra room to sit above bottom nav) */}
+      <div className="h-[calc(88px+env(safe-area-inset-bottom,16px))]" />
 
-      <div className="fixed left-0 right-0 bottom-[calc(136px+env(safe-area-inset-bottom,16px))] px-4 z-40">
-        <div className="glass border border-slate-100 rounded-3xl p-4 shadow-xl shadow-slate-200/40">
-          {!isEmailSent ? (
-            <button
-              onClick={handleSend}
-              disabled={noPermintaanError || isSending || isEditing || isSearchingGmail}
-              className={`w-full py-4 px-4 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base ${noPermintaanError || isSending || isEditing || isSearchingGmail
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-200'
-                }`}
-            >
-              {isSending ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>Mengirim Balasan...</span>
-                </div>
-              ) : (
-                <>
-                  <Reply size={20} />
-                  <span>Balas ke Gmail</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <div className="animate-fade-in-up">
-              <div className="flex items-center gap-2 mb-3 justify-center text-emerald-600 bg-emerald-50 py-2 rounded-xl border border-emerald-100">
-                <CheckCircle2 size={16} />
-                <span className="text-sm font-bold">Email Balasan Terkirim!</span>
-              </div>
+      {/* Render action bar into document.body to avoid being covered by Layout bottom nav */}
+      {typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(8px + env(safe-area-inset-bottom,12px))', padding: '0 1rem', zIndex: 99999 }}>
+          <div className="glass border border-slate-100 rounded-3xl p-3 shadow-xl shadow-slate-200/40 pointer-events-auto max-w-3xl mx-auto">
+            {!isEmailSent ? (
               <button
-                onClick={handleSaveArchive}
-                disabled={isSavingArchive}
-                className="w-full py-4 px-4 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base bg-slate-800 text-white hover:bg-slate-700"
-              >
-                {isSavingArchive ? (
+                onClick={handleSend}
+                disabled={noPermintaanError || isSending || isEditing || isSearchingGmail}
+                className={`w-full py-3 px-3 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base ${noPermintaanError || isSending || isEditing || isSearchingGmail
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-200'
+                  }`}>
+                {isSending ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin"></div>
-                    <span>Menyimpan...</span>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <span>Mengirim Balasan...</span>
                   </div>
                 ) : (
                   <>
-                    <DatabaseBackup size={20} className="text-emerald-400" />
-                    <span>Simpan ke Arsip STB</span>
+                    <Reply size={20} />
+                    <span>Balas ke Gmail</span>
                   </>
                 )}
               </button>
-            </div>
-          )}
-        </div>
-      </div>
+            ) : (
+              <div className="animate-fade-in-up">
+                <div className="flex items-center gap-2 mb-3 justify-center text-emerald-600 bg-emerald-50 py-2 rounded-xl border border-emerald-100">
+                  <CheckCircle2 size={16} />
+                  <span className="text-sm font-bold">Email Balasan Terkirim!</span>
+                </div>
+                <button
+                  onClick={handleSaveArchive}
+                  disabled={isSavingArchive}
+                  className="w-full py-4 px-4 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base bg-slate-800 text-white hover:bg-slate-700">
+                  {isSavingArchive ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border-2 border-slate-500 border-t-white rounded-full animate-spin"></div>
+                      <span>Menyimpan...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <DatabaseBackup size={20} className="text-emerald-400" />
+                      <span>Simpan ke Arsip STB</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
