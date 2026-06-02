@@ -209,8 +209,7 @@ const Scanner = () => {
             <Webcam
               audio={false}
               ref={webcamRef}
-              screenshotFormat="image/jpeg"
-              screenshotQuality={1}
+              screenshotFormat="image/png"
               videoConstraints={{
                 facingMode: { ideal: 'environment' },
                 width: { ideal: 3840 },
