@@ -49,16 +49,27 @@ const Scanner = () => {
       };
       const compressedFile = await imageCompression(imageFile, options);
       
+      const backendBase = import.meta.env.VITE_BACKEND_URL || '';
+      const endpoint = backendBase ? `${backendBase}/api/process-stb` : '/api/process-stb';
+
       // Send to Backend for OCR
       const formData = new FormData();
       formData.append('image', compressedFile);
 
-      const response = await fetch('/api/process-stb', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         body: formData,
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error(backendBase + `Server error ${response.status}: ${responseText || 'Tidak ada respon'}`);
+      }
+
+      const result = responseText ? JSON.parse(responseText) : null;
+      if (!result) {
+        throw new Error('Respon server kosong atau bukan JSON');
+      }
 
       if (result.success) {
         const reader = new FileReader();
