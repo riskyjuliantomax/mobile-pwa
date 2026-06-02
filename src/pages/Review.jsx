@@ -44,14 +44,14 @@ const Review = () => {
       try {
         result = text ? JSON.parse(text) : null;
       } catch (err) {
-        console.error('Invalid JSON from /api/gmail/search:', text);
-        alert('Gagal memproses hasil pencarian Gmail: respons server tidak valid. Lihat console untuk detail.');
+        console.error('Invalid JSON from Gmail search response:', text);
+        alert(`Gagal memproses hasil pencarian Gmail: response status ${response.status}. Lihat console untuk detail.`);
         return;
       }
 
       if (!response.ok || result?.success === false) {
-        console.error('Gmail search error:', result || text);
-        alert('Gmail search error: ' + (result?.error || 'Unknown error'));
+        console.error(`Gmail search failed (status ${response.status}):`, result || text);
+        alert(`Gmail search error: ${result?.error || `HTTP ${response.status}`}\n${text}`);
         return;
       }
 
@@ -389,9 +389,9 @@ const Review = () => {
       </div>
 
       {/* Bottom Action Spacer */}
-      <div className="h-[calc(96px+env(safe-area-inset-bottom,16px))]" />
+      <div className="h-[calc(156px+env(safe-area-inset-bottom,16px))]" />
 
-      <div className="fixed left-0 right-0 bottom-[calc(76px+env(safe-area-inset-bottom,16px))] px-4 z-40">
+      <div className="fixed left-0 right-0 bottom-[calc(136px+env(safe-area-inset-bottom,16px))] px-4 z-40">
         <div className="glass border border-slate-100 rounded-3xl p-4 shadow-xl shadow-slate-200/40">
           {!isEmailSent ? (
             <button
