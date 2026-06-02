@@ -9,6 +9,8 @@ const Scanner = () => {
   const webcamRef = useRef(null);
   const cropContainerRef = useRef(null);
   const previewRef = useRef(null);
+  const lastPointerEventRef = useRef(null);
+  const rafPendingRef = useRef(false);
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [editingImage, setEditingImage] = useState(null); // data URL for editor
@@ -24,6 +26,12 @@ const Scanner = () => {
 
   const [mode, setMode] = useState('camera');
   const [userInfo, setUserInfo] = useState({ name: '...', email: '', role: '...', avatar: null });
+  const [lastCompressedFile, setLastCompressedFile] = useState(null);
+  const [lastImageDataURL, setLastImageDataURL] = useState(null);
+  const [replyModalOpen, setReplyModalOpen] = useState(false);
+  const [replyInfo, setReplyInfo] = useState(null);
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [replyError, setReplyError] = useState('');
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -78,9 +86,8 @@ const Scanner = () => {
     };
   }, [isEditorOpen]);
 
-  const handleEditorPointerMove = useCallback((event) => {
+  const applyPointerMove = (event) => {
     if (!draggingHandle) return;
-    event.preventDefault();
     const container = cropContainerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
@@ -114,6 +121,19 @@ const Scanner = () => {
     } else if (draggingHandle === 'right') {
       setCropRight(Math.max(minCrop, Math.min(maxRight, rect.width - deltaX)));
     }
+  };
+
+  const handleEditorPointerMove = useCallback((event) => {
+    // throttle pointer move using requestAnimationFrame to improve responsiveness
+    event.preventDefault && event.preventDefault();
+    lastPointerEventRef.current = event;
+    if (rafPendingRef.current) return;
+    rafPendingRef.current = true;
+    requestAnimationFrame(() => {
+      rafPendingRef.current = false;
+      const ev = lastPointerEventRef.current;
+      if (ev) applyPointerMove(ev);
+    });
   }, [draggingHandle, cropLeft, cropRight, cropTop, cropBottom]);
 
   useEffect(() => {
@@ -168,18 +188,34 @@ const Scanner = () => {
       }
 
       if (result.success) {
+        // Keep compressed file and dataURL for later (reply or review)
+        setLastCompressedFile(compressedFile);
         const reader = new FileReader();
         reader.readAsDataURL(compressedFile);
         reader.onloadend = () => {
-          navigate('/review', { 
-            state: { 
-              imageData: reader.result,
-              noPermintaan: result.data.noPermintaan,
-              namaKapal: result.data.namaKapal,
-              namaBarang: result.data.namaBarang,
-              imageFile: compressedFile // Pass the actual file for the next step
-            } 
-          });
+          setLastImageDataURL(reader.result);
+          // If backend returned reply-related info (original message/thread or recipients), open reply modal
+          const info = result.data?.replyInfo || {
+            originalMessageId: result.data?.originalMessageId || result.data?.messageId,
+            threadId: result.data?.threadId,
+            to: result.data?.to || result.data?.recipients || null,
+            cc: result.data?.cc || null,
+          };
+          setReplyInfo(info);
+          // Open modal to let user choose reply behavior. If no reply info, proceed to review.
+          if (info && (info.originalMessageId || info.threadId || info.to)) {
+            setReplyModalOpen(true);
+          } else {
+            navigate('/review', { 
+              state: { 
+                imageData: reader.result,
+                noPermintaan: result.data.noPermintaan,
+                namaKapal: result.data.namaKapal,
+                namaBarang: result.data.namaBarang,
+                imageFile: compressedFile // Pass the actual file for the next step
+              } 
+            });
+          }
         };
       } else {
         throw new Error(result.error || 'Gagal memproses OCR');
@@ -211,6 +247,60 @@ const Scanner = () => {
     }
   }, [webcamRef]);
 
+  const sendReply = async (type) => {
+    if (!lastCompressedFile) return;
+    setIsSendingReply(true);
+    setReplyError('');
+    try {
+      const rawBackend = import.meta.env.VITE_BACKEND_URL || '';
+      const backendBase = rawBackend && !/^https?:\/\//i.test(rawBackend) ? `https://${rawBackend}` : rawBackend;
+      const endpoint = backendBase ? `${backendBase.replace(/\/$/, '')}/api/send-reply` : '/api/send-reply';
+
+      const form = new FormData();
+      form.append('image', lastCompressedFile);
+      form.append('replyType', type); // 'creator' or 'all'
+      if (replyInfo?.originalMessageId) form.append('originalMessageId', replyInfo.originalMessageId);
+      if (replyInfo?.threadId) form.append('threadId', replyInfo.threadId);
+      if (replyInfo?.to) form.append('to', Array.isArray(replyInfo.to) ? JSON.stringify(replyInfo.to) : replyInfo.to);
+      if (replyInfo?.cc) form.append('cc', Array.isArray(replyInfo.cc) ? JSON.stringify(replyInfo.cc) : replyInfo.cc);
+
+      const res = await fetch(endpoint, { method: 'POST', body: form });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `Server error ${res.status}`);
+      let body = null;
+      try { body = JSON.parse(text); } catch (e) { body = null; }
+
+      // On success, navigate to review with same state
+      navigate('/review', { 
+        state: { 
+          imageData: lastImageDataURL,
+          noPermintaan: body?.noPermintaan || null,
+          namaKapal: body?.namaKapal || null,
+          namaBarang: body?.namaBarang || null,
+          imageFile: lastCompressedFile
+        } 
+      });
+    } catch (err) {
+      console.error('sendReply error', err);
+      setReplyError(err.message || 'Gagal mengirim balasan.');
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
+  const skipReplyAndContinue = () => {
+    setReplyModalOpen(false);
+    navigate('/review', { 
+      state: { 
+        imageData: lastImageDataURL,
+        noPermintaan: null,
+        namaKapal: null,
+        namaBarang: null,
+        imageFile: lastCompressedFile
+      } 
+    });
+  };
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -226,6 +316,60 @@ const Scanner = () => {
         setIsEditorOpen(true);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRotate = (deltaDeg) => {
+    try {
+      const preview = previewRef.current;
+      if (!preview) {
+        setRotation((r) => (r + deltaDeg + 360) % 360);
+        return;
+      }
+      const rect = preview.getBoundingClientRect();
+      const W = rect.width;
+      const H = rect.height;
+      const x = cropLeft;
+      const y = cropTop;
+      const wRect = Math.max(0, W - cropLeft - cropRight);
+      const hRect = Math.max(0, H - cropTop - cropBottom);
+      const cx = x + wRect / 2;
+      const cy = y + hRect / 2;
+      const nx = cx / W;
+      const ny = cy / H;
+
+      let nxp = nx;
+      let nyp = ny;
+      const d = ((deltaDeg % 360) + 360) % 360;
+      if (d === 90) {
+        nxp = ny;
+        nyp = 1 - nx;
+      } else if (d === 270) {
+        nxp = 1 - ny;
+        nyp = nx;
+      } else if (d === 180) {
+        nxp = 1 - nx;
+        nyp = 1 - ny;
+      }
+
+      const newW = (d === 90 || d === 270) ? hRect : wRect;
+      const newH = (d === 90 || d === 270) ? wRect : hRect;
+      const newCx = nxp * W;
+      const newCy = nyp * H;
+      let newX = newCx - newW / 2;
+      let newY = newCy - newH / 2;
+      // clamp
+      newX = Math.max(0, Math.min(W - newW, newX));
+      newY = Math.max(0, Math.min(H - newH, newY));
+
+      setCropLeft(Math.round(newX));
+      setCropTop(Math.round(newY));
+      setCropRight(Math.round(W - newX - newW));
+      setCropBottom(Math.round(H - newY - newH));
+
+      setRotation((r) => (r + deltaDeg + 360) % 360);
+    } catch (e) {
+      setRotation((r) => (r + deltaDeg + 360) % 360);
     }
   };
 
@@ -580,13 +724,13 @@ const Scanner = () => {
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <button
-                  onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
+                  onClick={() => handleRotate(-90)}
                   className="flex-1 border border-white/20 bg-white/5 py-3 rounded-2xl text-sm font-semibold hover:bg-white/10"
                 >
                   Putar -90°
                 </button>
                 <button
-                  onClick={() => setRotation((r) => (r + 90) % 360)}
+                  onClick={() => handleRotate(90)}
                   className="flex-1 border border-white/20 bg-white/5 py-3 rounded-2xl text-sm font-semibold hover:bg-white/10"
                 >
                   Putar +90°
@@ -704,6 +848,45 @@ const Scanner = () => {
                   Simpan & Lanjutkan
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Reply choice modal (open after successful OCR if backend supplied reply info) */}
+      {replyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-slate-900 text-white rounded-2xl p-6 w-full max-w-md border border-white/10">
+            <h3 className="text-lg font-bold mb-2">Pilihan Balas Email</h3>
+            <p className="text-sm text-slate-300 mb-4">Pilih bagaimana Anda ingin mengirim balasan setelah foto dikirim:</p>
+            {replyInfo?.to && (
+              <p className="text-xs text-slate-400 mb-3">Penerima terdeteksi: {Array.isArray(replyInfo.to) ? replyInfo.to.join(', ') : replyInfo.to}</p>
+            )}
+            <div className="flex gap-3 mb-3">
+              <button
+                onClick={() => sendReply('creator')}
+                disabled={isSendingReply}
+                className="flex-1 bg-indigo-600 py-3 rounded-2xl text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Reply pembuat
+              </button>
+              <button
+                onClick={() => sendReply('all')}
+                disabled={isSendingReply}
+                className="flex-1 border border-white/20 py-3 rounded-2xl text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
+              >
+                Reply semua
+              </button>
+            </div>
+            {replyError && (
+              <div className="text-sm text-red-300 mb-3">{replyError}</div>
+            )}
+            <div className="flex items-center justify-between">
+              <button onClick={skipReplyAndContinue} className="text-sm text-slate-300 hover:underline">Lewati</button>
+              {isSendingReply ? (
+                <div className="text-sm text-slate-400">Mengirim...</div>
+              ) : (
+                <div className="text-sm text-slate-400">Pilih salah satu untuk melanjutkan</div>
+              )}
             </div>
           </div>
         </div>
