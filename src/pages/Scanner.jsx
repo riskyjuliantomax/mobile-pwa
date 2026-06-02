@@ -62,13 +62,20 @@ const Scanner = () => {
       });
 
       const responseText = await response.text();
+      console.log('process-stb response:', { status: response.status, ok: response.ok, body: responseText });
       if (!response.ok) {
         throw new Error(backendBase + `Server error ${response.status}: ${responseText || 'Tidak ada respon'}`);
       }
 
-      const result = responseText ? JSON.parse(responseText) : null;
-      if (!result) {
-        throw new Error('Respon server kosong atau bukan JSON');
+      let result = null;
+      if (responseText) {
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseErr) {
+          throw new Error(`Invalid JSON from server (status ${response.status}): ${responseText}`);
+        }
+      } else {
+        throw new Error(`Empty response from server (status ${response.status})`);
       }
 
       if (result.success) {
