@@ -8,6 +8,7 @@ import { supabase } from '../supabase';
 const Scanner = () => {
   const webcamRef = useRef(null);
   const cropContainerRef = useRef(null);
+  const previewRef = useRef(null);
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [editingImage, setEditingImage] = useState(null); // data URL for editor
@@ -85,30 +86,34 @@ const Scanner = () => {
     const deltaX = event.clientX - rect.left;
     const deltaY = event.clientY - rect.top;
     const minCrop = 0;
-    const maxCrop = 200;
+    const minVisible = 40;
+    const maxLeft = rect.width - cropRight - minVisible;
+    const maxRight = rect.width - cropLeft - minVisible;
+    const maxTop = rect.height - cropBottom - minVisible;
+    const maxBottom = rect.height - cropTop - minVisible;
 
     if (draggingHandle === 'top-left') {
-      setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
-      setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+      setCropTop(Math.max(minCrop, Math.min(maxTop, deltaY)));
+      setCropLeft(Math.max(minCrop, Math.min(maxLeft, deltaX)));
     } else if (draggingHandle === 'top-right') {
-      setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
-      setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+      setCropTop(Math.max(minCrop, Math.min(maxTop, deltaY)));
+      setCropRight(Math.max(minCrop, Math.min(maxRight, rect.width - deltaX)));
     } else if (draggingHandle === 'bottom-left') {
-      setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
-      setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+      setCropBottom(Math.max(minCrop, Math.min(maxBottom, rect.height - deltaY)));
+      setCropLeft(Math.max(minCrop, Math.min(maxLeft, deltaX)));
     } else if (draggingHandle === 'bottom-right') {
-      setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
-      setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+      setCropBottom(Math.max(minCrop, Math.min(maxBottom, rect.height - deltaY)));
+      setCropRight(Math.max(minCrop, Math.min(maxRight, rect.width - deltaX)));
     } else if (draggingHandle === 'top') {
-      setCropTop(Math.max(minCrop, Math.min(maxCrop, deltaY)));
+      setCropTop(Math.max(minCrop, Math.min(maxTop, deltaY)));
     } else if (draggingHandle === 'bottom') {
-      setCropBottom(Math.max(minCrop, Math.min(maxCrop, rect.height - deltaY)));
+      setCropBottom(Math.max(minCrop, Math.min(maxBottom, rect.height - deltaY)));
     } else if (draggingHandle === 'left') {
-      setCropLeft(Math.max(minCrop, Math.min(maxCrop, deltaX)));
+      setCropLeft(Math.max(minCrop, Math.min(maxLeft, deltaX)));
     } else if (draggingHandle === 'right') {
-      setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
+      setCropRight(Math.max(minCrop, Math.min(maxRight, rect.width - deltaX)));
     }
-  }, [draggingHandle]);
+  }, [draggingHandle, cropLeft, cropRight, cropTop, cropBottom]);
 
   useEffect(() => {
     if (!isEditorOpen) return undefined;
@@ -409,6 +414,7 @@ const Scanner = () => {
             {/* Main preview container */}
             <div className="relative w-full h-full max-w-2xl max-h-full">
               <div
+                ref={previewRef}
                 className="relative w-full h-full rounded-[28px] overflow-hidden bg-black border-2 border-white/10 shadow-2xl"
                 style={{
                   aspectRatio: '3/4'
@@ -418,7 +424,7 @@ const Scanner = () => {
                 <img
                   src={editingImage}
                   alt="edit preview"
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-contain"
                   style={{
                     transform: `rotate(${rotation}deg)`,
                     objectPosition: 'center'
@@ -612,17 +618,37 @@ const Scanner = () => {
                       img.src = editingImage;
                       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
                       
-                      // Scale crop values to image dimensions
-                      const containerWidth = 400; // approx max-w-2xl in px
-                      const scaleX = img.naturalWidth / containerWidth;
-                      const scaleY = img.naturalHeight / containerWidth; // assuming square crop frame
-                      
-                      const cw = img.naturalWidth;
-                      const ch = img.naturalHeight;
-                      const cropX = Math.floor(cropLeft * scaleX);
-                      const cropY = Math.floor(cropTop * scaleY);
-                      const cropW = Math.floor((cw - cropLeft * scaleX - cropRight * scaleX));
-                      const cropH = Math.floor((ch - cropTop * scaleY - cropBottom * scaleY));
+                      const preview = previewRef.current;
+                      const previewRect = preview?.getBoundingClientRect();
+                      const renderWidth = previewRect?.width || img.naturalWidth;
+                      const renderHeight = previewRect?.height || img.naturalHeight;
+                      const imageAspect = img.naturalWidth / img.naturalHeight;
+                      const containerAspect = renderWidth / renderHeight;
+                      let visibleWidth = renderWidth;
+                      let visibleHeight = renderHeight;
+                      let offsetX = 0;
+                      let offsetY = 0;
+
+                      if (imageAspect > containerAspect) {
+                        visibleWidth = renderWidth;
+                        visibleHeight = renderWidth / imageAspect;
+                        offsetY = (renderHeight - visibleHeight) / 2;
+                      } else {
+                        visibleHeight = renderHeight;
+                        visibleWidth = renderHeight * imageAspect;
+                        offsetX = (renderWidth - visibleWidth) / 2;
+                      }
+
+                      const scaleX = img.naturalWidth / visibleWidth;
+                      const scaleY = img.naturalHeight / visibleHeight;
+                      const cropLeftInImage = Math.max(0, cropLeft - offsetX);
+                      const cropTopInImage = Math.max(0, cropTop - offsetY);
+                      const cropRightInImage = Math.max(0, cropRight - offsetX);
+                      const cropBottomInImage = Math.max(0, cropBottom - offsetY);
+                      const cropX = Math.floor(cropLeftInImage * scaleX);
+                      const cropY = Math.floor(cropTopInImage * scaleY);
+                      const cropW = Math.floor(Math.max(0, visibleWidth - cropLeftInImage - cropRightInImage) * scaleX);
+                      const cropH = Math.floor(Math.max(0, visibleHeight - cropTopInImage - cropBottomInImage) * scaleY);
 
                       const radians = (rotation % 360) * Math.PI / 180;
                       const sin = Math.abs(Math.sin(radians));
