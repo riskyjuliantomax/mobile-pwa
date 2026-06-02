@@ -24,7 +24,7 @@ const Outbox = () => {
   };
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 pb-20">
       {/* Header */}
       <div className="px-4 pt-6 pb-4">
         <h1 className="text-2xl font-black text-slate-800">Outbox</h1>

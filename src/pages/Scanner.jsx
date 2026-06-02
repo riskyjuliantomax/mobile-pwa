@@ -256,7 +256,7 @@ const Scanner = () => {
       {/* Capture Button Area (only for camera mode) */}
       {mode === 'camera' && (
         <div className="fixed bottom-0 w-full flex flex-col items-center z-20 pointer-events-none"
-          style={{ paddingBottom: 'calc(70px + env(safe-area-inset-bottom, 16px))' }}
+          style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 8px))' }}
         >
           <div className="flex items-center justify-center gap-12 pointer-events-auto">
             {/* Spacer to balance the layout */}

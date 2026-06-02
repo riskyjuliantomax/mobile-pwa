@@ -29,58 +29,59 @@ const Layout = () => {
       <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob pointer-events-none"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-48 h-48 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000 pointer-events-none"></div>
 
-      {/* Main Content - overflow-hidden agar Scanner bisa full height, halaman lain scroll sendiri */}
+      {/* Main Content - stretch to fill, nav positioned fixed below */}
       <main className="flex-1 overflow-hidden z-10 relative">
         <Outlet />
       </main>
 
-      {/* Bottom Navigation (Floating Glass) - 4 tabs */}
-      <div className="fixed bottom-0 w-full p-2 pb-safe z-30 pointer-events-none">
-        <nav className="glass rounded-2xl flex justify-around p-1.5 pointer-events-auto shadow-[0_20px_40px_-15px_rgba(0,0,0,0.12)]">
+      {/* Bottom Navigation - Minimal Compact Design */}
+      <div className="fixed bottom-0 w-full z-30">
+        <nav className="flex justify-around items-center px-1.5 py-1 safe-area-inset-bottom gap-0.5 bg-white/60 backdrop-blur-xl border-t border-white/20">
           
           {/* Scan, Archive, Outbox */}
           {navItems.map(({ to, icon: Icon, label, badge }) => (
-            <NavLink key={to} to={to}>
+            <NavLink key={to} to={to} className="flex-1">
               {({ isActive }) => (
-                <span className={`flex flex-col items-center px-4 py-2 rounded-xl transition-all duration-300 relative ${
+                <div className={`flex flex-col items-center justify-center rounded-lg transition-all duration-200 min-h-12 ${
                   isActive
-                    ? 'text-white bg-indigo-600 shadow-lg shadow-indigo-200 scale-105'
-                    : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'
+                    ? 'text-indigo-600 bg-indigo-100'
+                    : 'text-slate-400 hover:text-slate-600'
                 }`}>
-                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                  <span className={`text-[10px] font-bold mt-1 leading-none ${isActive ? 'block' : 'hidden'}`}>{label}</span>
+                  <Icon size={18} strokeWidth={2} />
                   {badge && !isActive && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-white"></span>
+                    <span className="absolute top-1 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse border border-white"></span>
                   )}
-                </span>
+                </div>
               )}
             </NavLink>
           ))}
 
-          {/* Profile Tab (with avatar from Supabase) */}
-          <NavLink to="/profile">
+          {/* Profile Tab */}
+          <NavLink to="/profile" className="flex-1">
             {({ isActive }) => (
-              <span className={`flex flex-col items-center px-4 py-2 rounded-xl transition-all duration-300 ${
+              <div className={`flex flex-col items-center justify-center rounded-lg transition-all duration-200 min-h-12 ${
                 isActive
-                  ? 'text-white bg-indigo-600 shadow-lg shadow-indigo-200 scale-105'
-                  : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'
+                  ? 'text-indigo-600 bg-indigo-100'
+                  : 'text-slate-400 hover:text-slate-600'
               }`}>
                 {isActive ? (
-                  <UserCircle2 size={20} strokeWidth={2.5} />
+                  <UserCircle2 size={18} strokeWidth={2} />
                 ) : avatarUrl ? (
-                  <img src={avatarUrl} alt="profile" className="w-5 h-5 rounded-full object-cover" />
+                  <img src={avatarUrl} alt="profile" className="w-4 h-4 rounded-full object-cover" />
                 ) : (
-                  <div className="w-5 h-5 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-[10px] font-black shadow-sm">
+                  <div className="w-4 h-4 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white text-[7px] font-black">
                     {initials}
                   </div>
                 )}
-                <span className={`text-[10px] font-bold mt-1 leading-none ${isActive ? 'block' : 'hidden'}`}>Profil</span>
-              </span>
+              </div>
             )}
           </NavLink>
 
         </nav>
       </div>
+
+      {/* Safe area padding for bottom nav */}
+      <div className="h-safe-area-inset-bottom" />
     </div>
   );
 };

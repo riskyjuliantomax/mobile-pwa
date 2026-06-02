@@ -40,7 +40,7 @@ const Profile = () => {
   ];
 
   return (
-    <div className="min-h-full bg-slate-50">
+    <div className="min-h-full bg-slate-50 pb-20">
       {/* Profile Hero */}
       <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-indigo-800 px-6 pt-10 pb-16 relative overflow-hidden">
         <div className="absolute top-[-30%] right-[-10%] w-48 h-48 bg-white/10 rounded-full"></div>
