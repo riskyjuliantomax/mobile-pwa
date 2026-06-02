@@ -7,6 +7,7 @@ import { supabase } from '../supabase';
 
 const Scanner = () => {
   const webcamRef = useRef(null);
+  const cropContainerRef = useRef(null);
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [editingImage, setEditingImage] = useState(null); // data URL for editor
@@ -57,6 +58,18 @@ const Scanner = () => {
     }
     return () => {
       document.body.style.overflow = '';
+    };
+  }, [isEditorOpen]);
+
+  useEffect(() => {
+    const clearDrag = () => setDraggingHandle(null);
+    if (isEditorOpen) {
+      window.addEventListener('pointerup', clearDrag);
+      window.addEventListener('pointercancel', clearDrag);
+    }
+    return () => {
+      window.removeEventListener('pointerup', clearDrag);
+      window.removeEventListener('pointercancel', clearDrag);
     };
   }, [isEditorOpen]);
 
@@ -299,10 +312,12 @@ const Scanner = () => {
       {/* Image Editor Modal */}
       {isEditorOpen && editingImage && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/95 text-white flex flex-col overflow-hidden"
-          onMouseMove={(e) => {
+          className="fixed inset-0 z-40 bg-slate-950/95 text-white flex flex-col overflow-hidden touch-none"
+          style={{ touchAction: 'none' }}
+          onPointerMove={(e) => {
             if (!draggingHandle) return;
-            const container = e.currentTarget.querySelector('[data-crop-container]');
+            e.preventDefault();
+            const container = cropContainerRef.current;
             if (!container) return;
             const rect = container.getBoundingClientRect();
             const deltaX = e.clientX - rect.left;
@@ -332,8 +347,9 @@ const Scanner = () => {
               setCropRight(Math.max(minCrop, Math.min(maxCrop, rect.width - deltaX)));
             }
           }}
-          onMouseUp={() => setDraggingHandle(null)}
-          onMouseLeave={() => setDraggingHandle(null)}
+          onPointerUp={() => setDraggingHandle(null)}
+          onPointerCancel={() => setDraggingHandle(null)}
+          onTouchMove={(e) => e.preventDefault()}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
             <div>
@@ -343,7 +359,7 @@ const Scanner = () => {
             <button onClick={() => setIsEditorOpen(false)} className="text-slate-300 hover:text-white text-sm font-semibold">Tutup</button>
           </div>
 
-          <div className="relative flex-1 overflow-hidden p-4 flex items-center justify-center" data-crop-container>
+          <div className="relative flex-1 overflow-hidden p-4 flex items-center justify-center" data-crop-container ref={cropContainerRef}>
             {/* Main preview container */}
             <div className="relative w-full h-full max-w-2xl max-h-full">
               <div
@@ -424,41 +440,41 @@ const Scanner = () => {
                 {/* Corner handles - draggable */}
                 {/* Top-left corner */}
                 <div
-                  onMouseDown={() => setDraggingHandle('top-left')}
-                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-nwse-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('top-left'); }}
+                  className="absolute w-8 h-8 bg-indigo-500/90 rounded-full cursor-nwse-resize"
                   style={{
-                    top: `calc(${cropTop}px - 8px)`,
-                    left: `calc(${cropLeft}px - 8px)`,
+                    top: `calc(${cropTop}px - 12px)`,
+                    left: `calc(${cropLeft}px - 12px)`,
                     zIndex: 20
                   }}
                 />
                 {/* Top-right corner */}
                 <div
-                  onMouseDown={() => setDraggingHandle('top-right')}
-                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-nesw-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('top-right'); }}
+                  className="absolute w-8 h-8 bg-indigo-500/90 rounded-full cursor-nesw-resize"
                   style={{
-                    top: `calc(${cropTop}px - 8px)`,
-                    right: `calc(${cropRight}px - 8px)`,
+                    top: `calc(${cropTop}px - 12px)`,
+                    right: `calc(${cropRight}px - 12px)`,
                     zIndex: 20
                   }}
                 />
                 {/* Bottom-left corner */}
                 <div
-                  onMouseDown={() => setDraggingHandle('bottom-left')}
-                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-nesw-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('bottom-left'); }}
+                  className="absolute w-8 h-8 bg-indigo-500/90 rounded-full cursor-nesw-resize"
                   style={{
-                    bottom: `calc(${cropBottom}px - 8px)`,
-                    left: `calc(${cropLeft}px - 8px)`,
+                    bottom: `calc(${cropBottom}px - 12px)`,
+                    left: `calc(${cropLeft}px - 12px)`,
                     zIndex: 20
                   }}
                 />
                 {/* Bottom-right corner */}
                 <div
-                  onMouseDown={() => setDraggingHandle('bottom-right')}
-                  className="absolute w-4 h-4 bg-indigo-500 rounded-full cursor-se-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('bottom-right'); }}
+                  className="absolute w-8 h-8 bg-indigo-500/90 rounded-full cursor-se-resize"
                   style={{
-                    bottom: `calc(${cropBottom}px - 8px)`,
-                    right: `calc(${cropRight}px - 8px)`,
+                    bottom: `calc(${cropBottom}px - 12px)`,
+                    right: `calc(${cropRight}px - 12px)`,
                     zIndex: 20
                   }}
                 />
@@ -466,37 +482,37 @@ const Scanner = () => {
                 {/* Edge handles */}
                 {/* Top edge */}
                 <div
-                  onMouseDown={() => setDraggingHandle('top')}
-                  className="absolute left-1/2 -translate-x-1/2 w-6 h-2 bg-white/50 rounded-full cursor-n-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('top'); }}
+                  className="absolute left-1/2 -translate-x-1/2 w-12 h-4 bg-white/60 rounded-full cursor-n-resize"
                   style={{
-                    top: `calc(${cropTop}px - 6px)`,
+                    top: `calc(${cropTop}px - 10px)`,
                     zIndex: 20
                   }}
                 />
                 {/* Bottom edge */}
                 <div
-                  onMouseDown={() => setDraggingHandle('bottom')}
-                  className="absolute left-1/2 -translate-x-1/2 w-6 h-2 bg-white/50 rounded-full cursor-s-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('bottom'); }}
+                  className="absolute left-1/2 -translate-x-1/2 w-12 h-4 bg-white/60 rounded-full cursor-s-resize"
                   style={{
-                    bottom: `calc(${cropBottom}px - 6px)`,
+                    bottom: `calc(${cropBottom}px - 10px)`,
                     zIndex: 20
                   }}
                 />
                 {/* Left edge */}
                 <div
-                  onMouseDown={() => setDraggingHandle('left')}
-                  className="absolute top-1/2 -translate-y-1/2 w-2 h-6 bg-white/50 rounded-full cursor-w-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('left'); }}
+                  className="absolute top-1/2 -translate-y-1/2 w-4 h-12 bg-white/60 rounded-full cursor-w-resize"
                   style={{
-                    left: `calc(${cropLeft}px - 6px)`,
+                    left: `calc(${cropLeft}px - 10px)`,
                     zIndex: 20
                   }}
                 />
                 {/* Right edge */}
                 <div
-                  onMouseDown={() => setDraggingHandle('right')}
-                  className="absolute top-1/2 -translate-y-1/2 w-2 h-6 bg-white/50 rounded-full cursor-e-resize"
+                  onPointerDown={(e) => { e.preventDefault(); setDraggingHandle('right'); }}
+                  className="absolute top-1/2 -translate-y-1/2 w-4 h-12 bg-white/60 rounded-full cursor-e-resize"
                   style={{
-                    right: `calc(${cropRight}px - 6px)`,
+                    right: `calc(${cropRight}px - 10px)`,
                     zIndex: 20
                   }}
                 />
