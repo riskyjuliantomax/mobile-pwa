@@ -31,7 +31,7 @@ const Review = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(initialNoPermintaan || '');
   const [isSearchingGmail, setIsSearchingGmail] = useState(false);
-  const [replyType, setReplyType] = useState('reply'); // 'reply' atau 'replyAll'
+  const [replyType, setReplyType] = useState('replyAll'); // 'reply' atau 'replyAll'
 
   // Fungsi pencarian Gmail (bisa dipanggil ulang dengan no permintaan baru)
   const searchGmail = async (noPermintaan) => {
@@ -60,7 +60,7 @@ const Review = () => {
       if (result && result.success) {
         const threadsWithScores = result.threads.map((t, index) => ({
           ...t,
-          matchScore: index === 0 ? 98 : index === 1 ? 85 : 70
+          matchScore: typeof t.matchScore === 'number' ? t.matchScore : (index === 0 ? 98 : index === 1 ? 85 : 70)
         }));
         setEmailThreads(threadsWithScores);
         if (threadsWithScores.length > 0) {
