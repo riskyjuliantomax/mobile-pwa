@@ -708,10 +708,10 @@ const Scanner = () => {
                   Batal
                 </button>
                 <button
+                  disabled={isProcessing}
                   onClick={async () => {
                     try {
                       setEditorError('');
-                      setIsProcessing(true);
                       const img = new Image();
                       img.src = editingImage;
                       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
@@ -777,18 +777,21 @@ const Scanner = () => {
                       
                       const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
                       const file = new File([blob], 'stb_capture_edited.jpg', { type: 'image/jpeg' });
-                      await processImage(file);
+                      // Tutup editor SEBELUM kirim ke backend agar overlay processing tampil
                       setIsEditorOpen(false);
+                      await processImage(file);
                     } catch (err) {
                       console.error('Editor error:', err);
                       setEditorError(err.message || 'Gagal mengedit gambar. Silakan coba lagi.');
-                    } finally {
-                      setIsProcessing(false);
                     }
                   }}
-                  className="flex-1 bg-indigo-600 py-3 rounded-2xl text-sm font-semibold text-white hover:bg-indigo-500"
+                  className={`flex-1 py-3 rounded-2xl text-sm font-semibold text-white transition-all ${
+                    isProcessing
+                      ? 'bg-indigo-400 cursor-not-allowed opacity-60'
+                      : 'bg-indigo-600 hover:bg-indigo-500'
+                  }`}
                 >
-                  Simpan & Lanjutkan
+                  {isProcessing ? 'Memproses...' : 'Simpan & Lanjutkan'}
                 </button>
               </div>
             </div>
