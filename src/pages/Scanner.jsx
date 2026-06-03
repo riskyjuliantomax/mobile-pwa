@@ -254,15 +254,29 @@ const Scanner = () => {
     try {
       const rawBackend = import.meta.env.VITE_BACKEND_URL || '';
       const backendBase = rawBackend && !/^https?:\/\//i.test(rawBackend) ? `https://${rawBackend}` : rawBackend;
-      const endpoint = backendBase ? `${backendBase.replace(/\/$/, '')}/api/send-reply` : '/api/send-reply';
+      const endpoint = backendBase ? `${backendBase.replace(/\/$/, '')}/api/gmail/reply` : '/api/gmail/reply';
 
       const form = new FormData();
       form.append('image', lastCompressedFile);
-      form.append('replyType', type); // 'creator' or 'all'
-      if (replyInfo?.originalMessageId) form.append('originalMessageId', replyInfo.originalMessageId);
       if (replyInfo?.threadId) form.append('threadId', replyInfo.threadId);
-      if (replyInfo?.to) form.append('to', Array.isArray(replyInfo.to) ? JSON.stringify(replyInfo.to) : replyInfo.to);
-      if (replyInfo?.cc) form.append('cc', Array.isArray(replyInfo.cc) ? JSON.stringify(replyInfo.cc) : replyInfo.cc);
+      if (replyInfo?.originalMessageId) form.append('messageId', replyInfo.originalMessageId);
+      form.append('subject', replyInfo?.subject || '');
+
+      if (type === 'all') {
+        form.append('replyAll', 'true');
+        // Build recipients string from to + cc (arrays or single values)
+        const toArr = Array.isArray(replyInfo?.to) ? replyInfo.to : (replyInfo?.to ? [replyInfo.to] : []);
+        const ccArr = Array.isArray(replyInfo?.cc) ? replyInfo.cc : (replyInfo?.cc ? [replyInfo.cc] : []);
+        const recipients = [...toArr, ...ccArr].filter(Boolean).join(', ');
+        form.append('recipients', recipients);
+      } else {
+        form.append('replyAll', 'false');
+        // For single-reply, prefer first `to` address (fall back to cc or empty)
+        let toAddr = '';
+        if (replyInfo?.to) toAddr = Array.isArray(replyInfo.to) ? replyInfo.to[0] : replyInfo.to;
+        else if (replyInfo?.cc) toAddr = Array.isArray(replyInfo.cc) ? replyInfo.cc[0] : replyInfo.cc;
+        form.append('toEmail', toAddr || '');
+      }
 
       const res = await fetch(endpoint, { method: 'POST', body: form });
       const text = await res.text();
