@@ -405,7 +405,7 @@ const Scanner = () => {
 
         {/* Processing Overlay */}
         {isProcessing && (
-          <div className="absolute inset-0 glass-dark flex flex-col items-center justify-center z-30">
+          <div className="fixed inset-0 glass-dark flex flex-col items-center justify-center z-50">
             <div className="relative w-20 h-20 mb-6 flex items-center justify-center">
               <div className="absolute inset-0 border-4 border-indigo-500/30 rounded-full"></div>
               <div className="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
@@ -777,9 +777,10 @@ const Scanner = () => {
                       
                       const blob = await new Promise((res) => canvas.toBlob(res, 'image/jpeg', 0.95));
                       const file = new File([blob], 'stb_capture_edited.jpg', { type: 'image/jpeg' });
-                      // Tutup editor SEBELUM kirim ke backend agar overlay processing tampil
-                      setIsEditorOpen(false);
+                      // Kirim ke backend (overlay processing global akan menutupi layar)
                       await processImage(file);
+                      // Hanya tutup editor jika sukses memproses
+                      setIsEditorOpen(false);
                     } catch (err) {
                       console.error('Editor error:', err);
                       setEditorError(err.message || 'Gagal mengedit gambar. Silakan coba lagi.');
