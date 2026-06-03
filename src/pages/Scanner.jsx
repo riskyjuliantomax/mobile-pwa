@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import imageCompression from 'browser-image-compression';
-import { Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Image as ImageIcon, Sparkles, Brain, Cpu } from 'lucide-react';
 import { supabase } from '../supabase';
 
 const Scanner = () => {
@@ -26,6 +26,7 @@ const Scanner = () => {
 
   const [mode, setMode] = useState('camera');
   const [userInfo, setUserInfo] = useState({ name: '...', email: '', role: '...', avatar: null });
+  const [useAI, setUseAI] = useState(true); // true = Gemini AI, false = Tesseract lokal
 
 
   useEffect(() => {
@@ -159,6 +160,7 @@ const Scanner = () => {
       // Send to Backend for OCR
       const formData = new FormData();
       formData.append('image', compressedFile);
+      formData.append('useAI', useAI ? 'true' : 'false');
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -308,6 +310,22 @@ const Scanner = () => {
             <Sparkles className="text-indigo-400 flex-shrink-0" size={18} />
             STB Vision
           </h1>
+          {/* Toggle AI / Tesseract */}
+          <button
+            onClick={() => setUseAI(v => !v)}
+            className={`mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all active:scale-95 ${
+              useAI
+                ? 'bg-indigo-500/20 border-indigo-400/40 text-indigo-300'
+                : 'bg-slate-700/60 border-slate-500/40 text-slate-300'
+            }`}
+            title={useAI ? 'Mode: Gemini AI (klik untuk ganti ke Tesseract Lokal)' : 'Mode: Tesseract Lokal (klik untuk ganti ke Gemini AI)'}
+          >
+            {useAI ? (
+              <><Brain size={10} className="flex-shrink-0" /> Gemini AI</>
+            ) : (
+              <><Cpu size={10} className="flex-shrink-0" /> Tesseract Lokal</>
+            )}
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <div className="text-right">
@@ -391,10 +409,10 @@ const Scanner = () => {
             <div className="relative w-20 h-20 mb-6 flex items-center justify-center">
               <div className="absolute inset-0 border-4 border-indigo-500/30 rounded-full"></div>
               <div className="absolute inset-0 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-              <Sparkles className="text-indigo-400 animate-pulse" size={24} />
+              {useAI ? <Sparkles className="text-indigo-400 animate-pulse" size={24} /> : <Cpu className="text-indigo-400 animate-pulse" size={24} />}
             </div>
             <h3 className="text-white font-bold text-lg mb-1">Menganalisis Foto...</h3>
-            <p className="text-indigo-300 text-sm">AI sedang membaca data STB</p>
+            <p className="text-indigo-300 text-sm">{useAI ? 'Gemini AI sedang membaca data STB' : 'Tesseract (Lokal) sedang membaca data STB'}</p>
           </div>
         )}
       </div>
