@@ -26,12 +26,7 @@ const Scanner = () => {
 
   const [mode, setMode] = useState('camera');
   const [userInfo, setUserInfo] = useState({ name: '...', email: '', role: '...', avatar: null });
-  const [lastCompressedFile, setLastCompressedFile] = useState(null);
-  const [lastImageDataURL, setLastImageDataURL] = useState(null);
-  const [replyModalOpen, setReplyModalOpen] = useState(false);
-  const [replyInfo, setReplyInfo] = useState(null);
-  const [isSendingReply, setIsSendingReply] = useState(false);
-  const [replyError, setReplyError] = useState('');
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -188,34 +183,18 @@ const Scanner = () => {
       }
 
       if (result.success) {
-        // Keep compressed file and dataURL for later (reply or review)
-        setLastCompressedFile(compressedFile);
         const reader = new FileReader();
         reader.readAsDataURL(compressedFile);
         reader.onloadend = () => {
-          setLastImageDataURL(reader.result);
-          // If backend returned reply-related info (original message/thread or recipients), open reply modal
-          const info = result.data?.replyInfo || {
-            originalMessageId: result.data?.originalMessageId || result.data?.messageId,
-            threadId: result.data?.threadId,
-            to: result.data?.to || result.data?.recipients || null,
-            cc: result.data?.cc || null,
-          };
-          setReplyInfo(info);
-          // Open modal to let user choose reply behavior. If no reply info, proceed to review.
-          if (info && (info.originalMessageId || info.threadId || info.to)) {
-            setReplyModalOpen(true);
-          } else {
-            navigate('/review', { 
-              state: { 
-                imageData: reader.result,
-                noPermintaan: result.data.noPermintaan,
-                namaKapal: result.data.namaKapal,
-                namaBarang: result.data.namaBarang,
-                imageFile: compressedFile // Pass the actual file for the next step
-              } 
-            });
-          }
+          navigate('/review', { 
+            state: { 
+              imageData: reader.result,
+              noPermintaan: result.data.noPermintaan,
+              namaKapal: result.data.namaKapal,
+              namaBarang: result.data.namaBarang,
+              imageFile: compressedFile
+            } 
+          });
         };
       } else {
         throw new Error(result.error || 'Gagal memproses OCR');
@@ -246,74 +225,6 @@ const Scanner = () => {
         });
     }
   }, [webcamRef]);
-
-  const sendReply = async (type) => {
-    if (!lastCompressedFile) return;
-    setIsSendingReply(true);
-    setReplyError('');
-    try {
-      const rawBackend = import.meta.env.VITE_BACKEND_URL || '';
-      const backendBase = rawBackend && !/^https?:\/\//i.test(rawBackend) ? `https://${rawBackend}` : rawBackend;
-      const endpoint = backendBase ? `${backendBase.replace(/\/$/, '')}/api/gmail/reply` : '/api/gmail/reply';
-
-      const form = new FormData();
-      form.append('image', lastCompressedFile);
-      if (replyInfo?.threadId) form.append('threadId', replyInfo.threadId);
-      if (replyInfo?.originalMessageId) form.append('messageId', replyInfo.originalMessageId);
-      form.append('subject', replyInfo?.subject || '');
-
-      if (type === 'all') {
-        form.append('replyAll', 'true');
-        // Build recipients string from to + cc (arrays or single values)
-        const toArr = Array.isArray(replyInfo?.to) ? replyInfo.to : (replyInfo?.to ? [replyInfo.to] : []);
-        const ccArr = Array.isArray(replyInfo?.cc) ? replyInfo.cc : (replyInfo?.cc ? [replyInfo.cc] : []);
-        const recipients = [...toArr, ...ccArr].filter(Boolean).join(', ');
-        form.append('recipients', recipients);
-      } else {
-        form.append('replyAll', 'false');
-        // For single-reply, prefer first `to` address (fall back to cc or empty)
-        let toAddr = '';
-        if (replyInfo?.to) toAddr = Array.isArray(replyInfo.to) ? replyInfo.to[0] : replyInfo.to;
-        else if (replyInfo?.cc) toAddr = Array.isArray(replyInfo.cc) ? replyInfo.cc[0] : replyInfo.cc;
-        form.append('toEmail', toAddr || '');
-      }
-
-      const res = await fetch(endpoint, { method: 'POST', body: form });
-      const text = await res.text();
-      if (!res.ok) throw new Error(text || `Server error ${res.status}`);
-      let body = null;
-      try { body = JSON.parse(text); } catch (e) { body = null; }
-
-      // On success, navigate to review with same state
-      navigate('/review', { 
-        state: { 
-          imageData: lastImageDataURL,
-          noPermintaan: body?.noPermintaan || null,
-          namaKapal: body?.namaKapal || null,
-          namaBarang: body?.namaBarang || null,
-          imageFile: lastCompressedFile
-        } 
-      });
-    } catch (err) {
-      console.error('sendReply error', err);
-      setReplyError(err.message || 'Gagal mengirim balasan.');
-    } finally {
-      setIsSendingReply(false);
-    }
-  };
-
-  const skipReplyAndContinue = () => {
-    setReplyModalOpen(false);
-    navigate('/review', { 
-      state: { 
-        imageData: lastImageDataURL,
-        noPermintaan: null,
-        namaKapal: null,
-        namaBarang: null,
-        imageFile: lastCompressedFile
-      } 
-    });
-  };
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -866,45 +777,7 @@ const Scanner = () => {
           </div>
         </div>
       )}
-      {/* Reply choice modal (open after successful OCR if backend supplied reply info) */}
-      {replyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-slate-900 text-white rounded-2xl p-6 w-full max-w-md border border-white/10">
-            <h3 className="text-lg font-bold mb-2">Pilihan Balas Email</h3>
-            <p className="text-sm text-slate-300 mb-4">Pilih bagaimana Anda ingin mengirim balasan setelah foto dikirim:</p>
-            {replyInfo?.to && (
-              <p className="text-xs text-slate-400 mb-3">Penerima terdeteksi: {Array.isArray(replyInfo.to) ? replyInfo.to.join(', ') : replyInfo.to}</p>
-            )}
-            <div className="flex gap-3 mb-3">
-              <button
-                onClick={() => sendReply('creator')}
-                disabled={isSendingReply}
-                className="flex-1 bg-indigo-600 py-3 rounded-2xl text-sm font-semibold text-white disabled:opacity-50"
-              >
-                Reply pembuat
-              </button>
-              <button
-                onClick={() => sendReply('all')}
-                disabled={isSendingReply}
-                className="flex-1 border border-white/20 py-3 rounded-2xl text-sm font-semibold hover:bg-white/5 disabled:opacity-50"
-              >
-                Reply semua
-              </button>
-            </div>
-            {replyError && (
-              <div className="text-sm text-red-300 mb-3">{replyError}</div>
-            )}
-            <div className="flex items-center justify-between">
-              <button onClick={skipReplyAndContinue} className="text-sm text-slate-300 hover:underline">Lewati</button>
-              {isSendingReply ? (
-                <div className="text-sm text-slate-400">Mengirim...</div>
-              ) : (
-                <div className="text-sm text-slate-400">Pilih salah satu untuk melanjutkan</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

@@ -31,6 +31,7 @@ const Review = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(initialNoPermintaan || '');
   const [isSearchingGmail, setIsSearchingGmail] = useState(false);
+  const [replyType, setReplyType] = useState('reply'); // 'reply' atau 'replyAll'
 
   // Fungsi pencarian Gmail (bisa dipanggil ulang dengan no permintaan baru)
   const searchGmail = async (noPermintaan) => {
@@ -119,21 +120,27 @@ const Review = () => {
     setIsSending(true);
     try {
       const formData = new FormData();
-      // Ensure we have a File. If only data URL is present, convert to blob first.
+      // Ensure we have a File with a filename based on the latest noPermintaan
+      const safeNoPermintaan = (extractedData.noPermintaan || 'capture').replace(/[\/\\?%*:|"<>]/g, '_');
+      const fileName = `stb_${safeNoPermintaan}.jpg`;
+
       let fileToSend = imageFile;
-      if (!fileToSend && imageData) {
+      if (fileToSend) {
+        // Recreate the File object with the new custom name
+        fileToSend = new File([fileToSend], fileName, { type: fileToSend.type });
+      } else if (imageData) {
         const res = await fetch(imageData);
         const blob = await res.blob();
-        fileToSend = new File([blob], `stb_${(extractedData.noPermintaan || 'capture').replace(/\//g,'_')}.jpg`, { type: blob.type || 'image/jpeg' });
+        fileToSend = new File([blob], fileName, { type: blob.type || 'image/jpeg' });
       }
       formData.append('image', fileToSend);
       formData.append('threadId', thread.id);
       formData.append('messageId', thread.messageId);
       formData.append('subject', thread.subject);
-      // Allow reply-all: send recipients string as returned by backend
       formData.append('toEmail', thread.sender);
-      formData.append('replyAll', 'true');
-      formData.append('recipients', thread.recipients || '');
+      formData.append('replyAll', replyType === 'replyAll' ? 'true' : 'false');
+      formData.append('toEmailsAll', thread.to || '');
+      formData.append('ccEmail', thread.cc || '');
 
       const response = await fetch(`${backendApi}/gmail/reply`, {
         method: 'POST',
@@ -407,25 +414,56 @@ const Review = () => {
         <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'calc(8px + env(safe-area-inset-bottom,12px))', padding: '0 1rem', zIndex: 99999 }}>
           <div className="glass border border-slate-100 rounded-3xl p-3 shadow-xl shadow-slate-200/40 pointer-events-auto max-w-3xl mx-auto">
             {!isEmailSent ? (
-              <button
-                onClick={handleSend}
-                disabled={noPermintaanError || isSending || isEditing || isSearchingGmail}
-                className={`w-full py-3 px-3 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base ${noPermintaanError || isSending || isEditing || isSearchingGmail
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-200'
-                  }`}>
-                {isSending ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Mengirim Balasan...</span>
+              <div className="flex flex-col gap-3">
+                {selectedThread && (
+                  <div className="flex flex-col gap-1.5 px-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tipe Balasan:</span>
+                    <div className="flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/40">
+                      <button
+                        type="button"
+                        onClick={() => setReplyType('reply')}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                          replyType === 'reply'
+                            ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/30'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Reply (Hanya Pengirim)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReplyType('replyAll')}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all ${
+                          replyType === 'replyAll'
+                            ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/30'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        Reply to All (Termasuk Cc)
+                      </button>
+                    </div>
                   </div>
-                ) : (
-                  <>
-                    <Reply size={20} />
-                    <span>Balas ke Gmail</span>
-                  </>
                 )}
-              </button>
+                <button
+                  onClick={handleSend}
+                  disabled={noPermintaanError || isSending || isEditing || isSearchingGmail}
+                  className={`w-full py-3 px-3 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-95 font-black shadow-lg text-base ${noPermintaanError || isSending || isEditing || isSearchingGmail
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-200'
+                    }`}>
+                  {isSending ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      <span>Mengirim Balasan...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Reply size={20} />
+                      <span>{replyType === 'replyAll' ? 'Balas Semua ke Gmail' : 'Balas ke Gmail'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
             ) : (
               <div className="animate-fade-in-up">
                 <div className="flex items-center gap-2 mb-3 justify-center text-emerald-600 bg-emerald-50 py-2 rounded-xl border border-emerald-100">
